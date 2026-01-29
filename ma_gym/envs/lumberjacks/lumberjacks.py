@@ -289,43 +289,108 @@ class Lumberjacks(gym.Env):
         )
         yield from self._view_generator(mask)
 
-    def step(self, agents_action: List[int]):
+    def step(self, agents_action):
         assert (self._step_count is not None), \
             "Call reset before using step method."
-        # Assert would slow down the environment which is undesirable. We rather expect the check on the user side.
-        # assert len(agents_action) == self.n_agents
 
-        # Following snippet of code was refereed from:
-        # https://github.com/openai/gym/blob/master/gym/envs/classic_control/cartpole.py#L124
+        # 检查是否已经结束
         if all(self._agent_dones):
             if self.steps_beyond_done == 0:
                 logger.warning(
-                    "You are calling 'step()' even though this environment has already returned all(dones) = True for "
-                    "all agents. You should always call 'reset()' once you receive 'all(dones) = True' -- any further"
-                    " steps are undefined behavior.")
+                    "You are calling 'step()' even though this environment has already returned all(dones) = True...")
             self.steps_beyond_done += 1
             return self.get_agent_obs(), [0] * self.n_agents, self._agent_dones, {}
 
         self._step_count += 1
-        rewards = np.full(self.n_agents, self._step_cost)
+        # 初始化奖励为步数惩罚
+        rewards = np.full(self.n_agents, self._step_cost, dtype=np.float32)
 
-        # Move agents
+        # 1. 执行移动 (Movement)
+        # 使用原有的 _update_agent_pos 方法以确保 self._agent_map 正确更新
         for (agent_id, agent), action in zip(self._agent_generator(), agents_action):
             if not self._agent_dones[agent_id]:
                 self._update_agent_pos(agent, action)
 
-        # Cut down trees
-        mask = (np.sum(self._agent_map, axis=2) >= self._tree_map) & (self._tree_map > 0)
-        self._tree_map[mask] = 0
+        # 2. 自定义奖励逻辑 (Custom Reward Logic)
+        
+        # A. 统计每个位置上的智能体 (Group agents by position)
+        # agent.pos 已经是扩展坐标系，可直接用于索引 _tree_map
+        agents_at_pos = {}
+        for agent_id, agent in self._agent_generator():
+            # 将 numpy tuple 转为 hashable key (如果是 tuple 则无需转换)
+            pos = tuple(agent.pos) 
+            if pos not in agents_at_pos:
+                agents_at_pos[pos] = []
+            agents_at_pos[pos].append(agent_id)
 
-        # Calculate rewards
-        rewards += np.sum(mask * self._tree_cutdown_reward, axis=(0, 1))
-        self._total_episode_reward += rewards
+        # B. 遍历有人位置，计算砍树奖励
+        for pos, agent_indices in agents_at_pos.items():
+            # 获取该位置的树木强度
+            tree_strength = self._tree_map[pos]
 
+            # 判断：有树 且 人数足够
+            if tree_strength > 0 and len(agent_indices) >= tree_strength:
+                
+                # --- [您的修改逻辑] ---
+                # 总奖励 = 基础奖励 * 树木强度
+                total_tree_reward = self._tree_cutdown_reward * tree_strength
+                
+                # 平分给参与者 (Split among participants)
+                reward_per_agent = total_tree_reward / len(agent_indices)
+                
+                # 发放奖励
+                for agent_id in agent_indices:
+                    rewards[agent_id] += reward_per_agent
+                
+                # 砍倒树木 (移除)
+                self._tree_map[pos] = 0
+                
+                # 累加到总奖励记录中 (用于日志/渲染)
+                self._total_episode_reward[agent_indices] += reward_per_agent
+
+        # 3. 检查结束条件 (Termination Check)
         if (self._step_count >= self._max_steps) or (np.count_nonzero(self._tree_map) == 0):
             self._agent_dones = [True] * self.n_agents
 
         return self.get_agent_obs(), rewards, self._agent_dones, {}
+        
+    # def step(self, agents_action: List[int]):
+    #     assert (self._step_count is not None), \
+    #         "Call reset before using step method."
+    #     # Assert would slow down the environment which is undesirable. We rather expect the check on the user side.
+    #     # assert len(agents_action) == self.n_agents
+
+    #     # Following snippet of code was refereed from:
+    #     # https://github.com/openai/gym/blob/master/gym/envs/classic_control/cartpole.py#L124
+    #     if all(self._agent_dones):
+    #         if self.steps_beyond_done == 0:
+    #             logger.warning(
+    #                 "You are calling 'step()' even though this environment has already returned all(dones) = True for "
+    #                 "all agents. You should always call 'reset()' once you receive 'all(dones) = True' -- any further"
+    #                 " steps are undefined behavior.")
+    #         self.steps_beyond_done += 1
+    #         return self.get_agent_obs(), [0] * self.n_agents, self._agent_dones, {}
+
+    #     self._step_count += 1
+    #     rewards = np.full(self.n_agents, self._step_cost)
+
+    #     # Move agents
+    #     for (agent_id, agent), action in zip(self._agent_generator(), agents_action):
+    #         if not self._agent_dones[agent_id]:
+    #             self._update_agent_pos(agent, action)
+
+    #     # Cut down trees
+    #     mask = (np.sum(self._agent_map, axis=2) >= self._tree_map) & (self._tree_map > 0)
+    #     self._tree_map[mask] = 0
+
+    #     # Calculate rewards
+    #     rewards += np.sum(mask * self._tree_cutdown_reward, axis=(0, 1))
+    #     self._total_episode_reward += rewards
+
+    #     if (self._step_count >= self._max_steps) or (np.count_nonzero(self._tree_map) == 0):
+    #         self._agent_dones = [True] * self.n_agents
+
+    #     return self.get_agent_obs(), rewards, self._agent_dones, {}
 
     def _update_agent_pos(self, agent: Agent, move: int):
         """Moves `agent` according the `move` command."""
