@@ -423,9 +423,13 @@ class Lumberjacks(gym.Env):
         #                      (self._agent_view[0] + self._grid_shape[0] - 1,
         #                       self._agent_view[1] + self._grid_shape[1] - 1),
         #                      ))
+        # return (
+        #     min(max(next_pos[0], self._agent_view[0]), self._grid_shape[0] - 1),
+        #     min(max(next_pos[1], self._agent_view[1]), self._grid_shape[1] - 1),
+        # )
         return (
-            min(max(next_pos[0], self._agent_view[0]), self._grid_shape[0] - 1),
-            min(max(next_pos[1], self._agent_view[1]), self._grid_shape[1] - 1),
+            min(max(next_pos[0], self._agent_view[0]), self._agent_view[0] + self._grid_shape[0] - 1),
+            min(max(next_pos[1], self._agent_view[1]), self._agent_view[1] + self._grid_shape[1] - 1),
         )
 
     def seed(self, n: Union[None, int] = None):
