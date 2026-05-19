@@ -159,7 +159,15 @@ class Lumberjacks(gym.Env):
                 self._agents.append(Agent(agent_id, pos=pos))
                 agent_id += 1
             elif cell == PRE_IDS['tree']:
-                self._tree_map[pos] = self.np_random.randint(1, self.n_agents + 1)
+                # self._tree_map[pos] = self.np_random.randint(1, self.n_agents + 1)
+                # tree_id += 1
+                if self._grid_shape[0] > 10 or self._grid_shape[1] > 10:
+                    max_tree_strength = max(1, int(2 * self.n_agents / 3))
+                else:
+                    # 10x10 及以下的网格，保持原来的最大强度 (即智能体总数 N)
+                    max_tree_strength = self.n_agents
+                
+                self._tree_map[pos] = self.np_random.randint(1, max_tree_strength + 1)
                 tree_id += 1
 
     def _to_extended_coordinates(self, relative_coordinates):
