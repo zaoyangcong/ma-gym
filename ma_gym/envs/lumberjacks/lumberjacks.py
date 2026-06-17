@@ -87,6 +87,7 @@ class Lumberjacks(gym.Env):
         self._step_count = None
         self._tree_cutdown_reward = tree_cutdown_reward
         self._max_steps = max_steps
+        self._max_tree_strength = max_tree_strength
         self.steps_beyond_done = 0
         self.seed()
 
