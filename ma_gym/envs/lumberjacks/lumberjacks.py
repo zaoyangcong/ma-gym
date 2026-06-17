@@ -72,7 +72,8 @@ class Lumberjacks(gym.Env):
 
     def __init__(self, grid_shape: Coordinates = (5, 5), n_agents: int = 2, n_trees: int = 12,
                  agent_view: Tuple[int, int] = (1, 1), full_observable: bool = False,
-                 step_cost: float = -1, tree_cutdown_reward: float = 10, max_steps: int = 100):
+                 step_cost: float = -1, tree_cutdown_reward: float = 10, max_steps: int = 100,
+                max_tree_strength: int = None):
         assert 0 < n_agents
         assert n_agents + n_trees <= np.prod(grid_shape)
         assert 1 <= agent_view[0] <= grid_shape[0] and 1 <= agent_view[1] <= grid_shape[1]
@@ -161,11 +162,20 @@ class Lumberjacks(gym.Env):
             elif cell == PRE_IDS['tree']:
                 # self._tree_map[pos] = self.np_random.randint(1, self.n_agents + 1)
                 # tree_id += 1
-                if self._grid_shape[0] > 10 or self._grid_shape[1] > 10:
-                    max_tree_strength = max(1, int(2 * self.n_agents / 3))
+                # if self._grid_shape[0] > 10 or self._grid_shape[1] > 10:
+                #     max_tree_strength = max(1, int(2 * self.n_agents / 3))
+                # else:
+                #     # 10x10 及以下的网格，保持原来的最大强度 (即智能体总数 N)
+                #     max_tree_strength = self.n_agents
+                # 1. 如果用户显式传入了最大强度参数，则使用该参数 (但不超过总智能体数)
+                if self._max_tree_strength is not None:
+                    current_max_strength = min(self._max_tree_strength, self.n_agents)
+                # 2. 如果未传入参数，则回退到我们之前设计的“根据地图大小自适应”逻辑
                 else:
-                    # 10x10 及以下的网格，保持原来的最大强度 (即智能体总数 N)
-                    max_tree_strength = self.n_agents
+                    if self._grid_shape[0] > 10 or self._grid_shape[1] > 10:
+                        current_max_strength = max(1, int(2 * self.n_agents / 3))
+                    else:
+                        current_max_strength = self.n_agents
                 
                 self._tree_map[pos] = self.np_random.randint(1, max_tree_strength + 1)
                 tree_id += 1
