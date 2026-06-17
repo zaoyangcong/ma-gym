@@ -178,7 +178,7 @@ class Lumberjacks(gym.Env):
                     else:
                         current_max_strength = self.n_agents
                 
-                self._tree_map[pos] = self.np_random.randint(1, max_tree_strength + 1)
+                self._tree_map[pos] = self.np_random.randint(1, current_max_strength + 1)
                 tree_id += 1
 
     def _to_extended_coordinates(self, relative_coordinates):
